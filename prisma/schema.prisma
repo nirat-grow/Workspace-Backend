@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String            @id @default(cuid())
+  name          String
+  email         String            @unique
+  password      String
+  globalRole    GlobalRole        @default(MEMBER)
+  createdAt     DateTime          @default(now())
+  teamLeaderId  String?
+  designation   String?
+  telegramId    String?
+  profilePic    String?
+  comments      Comment[]
+  projectRoles  ProjectMember[]
+  assignedTasks Task[]            @relation("AssignedTasks")
+  timeLogs      TimeLog[]
+  teamLeader    User?             @relation("TeamLeader", fields: [teamLeaderId], references: [id])
+  teamMembers   User[]            @relation("TeamLeader")
+  workspaces    WorkspaceMember[]
+}
+
+model Workspace {
+  id        String            @id @default(cuid())
+  name      String
+  createdAt DateTime          @default(now())
+  invites   Invite[]
+  projects  Project[]
+  members   WorkspaceMember[]
+}
+
+model WorkspaceMember {
+  id          String     @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        GlobalRole
+  user        User       @relation(fields: [userId], references: [id])
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id])
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  name        String
+  key         String          @db.VarChar(5)
+  workspaceId String
+  createdAt   DateTime        @default(now())
+  activities  Activity[]
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id])
+  members     ProjectMember[]
+  tasks       Task[]
+}
+
+model ProjectMember {
+  id            String  @id @default(cuid())
+  projectId     String
+  userId        String
+  canCreateTask Boolean @default(false)
+  canAssignTask Boolean @default(false)
+  canEditTask   Boolean @default(false)
+  canDeleteTask Boolean @default(false)
+  project       Project @relation(fields: [projectId], references: [id])
+  user          User    @relation(fields: [userId], references: [id])
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  taskKey     String
+  title       String
+  description String?
+  priority    Priority     @default(MEDIUM)
+  status      Status       @default(TODO)
+  dueDate     DateTime?
+  estHours    Float?
+  projectId   String
+  assigneeId  String?
+  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime     @default(now())
+  stuckReason String?
+  holdReason  String?
+  endTime     DateTime?
+  startTime   DateTime?
+  attachments Attachment[]
+  comments    Comment[]
+  assignee    User?        @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  project     Project      @relation(fields: [projectId], references: [id])
+  timeLogs    TimeLog[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  text      String
+  taskId    String
+  authorId  String
+  createdAt DateTime @default(now())
+  author    User     @relation(fields: [authorId], references: [id])
+  task      Task     @relation(fields: [taskId], references: [id])
+}
+
+model TimeLog {
+  id       String   @id @default(cuid())
+  hours    Float
+  note     String?
+  taskId   String
+  userId   String
+  loggedAt DateTime @default(now())
+  task     Task     @relation(fields: [taskId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String
+  taskId    String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  text      String
+  level     String
+  projectId String?
+  createdAt DateTime @default(now())
+  project   Project? @relation(fields: [projectId], references: [id])
+}
+
+model Invite {
+  id          String     @id @default(cuid())
+  email       String
+  token       String     @unique @default(cuid())
+  role        GlobalRole
+  workspaceId String
+  used        Boolean    @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime   @default(now())
+  designation String?
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id])
+}
+
+enum GlobalRole {
+  ADMIN
+  MANAGER
+  MEMBER
+  TEAM_LEADER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum Status {
+  TODO
+  PROGRESS
+  REVIEW
+  DONE
+  STUCK
+  HOLD
+}
