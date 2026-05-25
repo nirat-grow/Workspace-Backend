@@ -418,6 +418,20 @@ exports.getHours = async (req, res) => {
     let whereClause = { workspaceId: req.user.primaryWorkspaceId };
     if (projectId) whereClause.id = projectId;
 
+    // For personal/targeted reports, only show projects the user is actually a member of
+    if (isPersonal || targetUserId) {
+      whereClause.members = {
+        some: { userId: effectiveUserId }
+      };
+    }
+
+    // For Team Leader overall report, only show projects where at least one team member is added
+    if (showTeamData && teamUserIds.length > 0) {
+      whereClause.members = {
+        some: { userId: { in: teamUserIds } }
+      };
+    }
+
     const projects = await prisma.project.findMany({
       where: whereClause,
       include: {

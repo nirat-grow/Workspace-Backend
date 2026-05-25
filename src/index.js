@@ -25,7 +25,7 @@ const io = new Server(server, {
 app.use(cors({ origin: process.env.FRONTEND_URL }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // DB Prisma instance globally accessible (usually we'd put this in a separate file, but for simplicity we can export it or just use it in controllers)
 

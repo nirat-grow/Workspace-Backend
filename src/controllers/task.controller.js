@@ -6,11 +6,11 @@ exports.getMyAssignedTasks = async (req, res) => {
     let tasks = await prisma.task.findMany({
       where: { assigneeId: req.user.id },
       include: {
-        assignee: { 
-          select: { 
+        assignee: {
+          select: {
             id: true, name: true, profilePic: true, designation: true,
-            teamLeader: { select: { name: true } } 
-          } 
+            teamLeader: { select: { name: true } }
+          }
         },
         project: {
           select: {
@@ -32,7 +32,7 @@ exports.getMyAssignedTasks = async (req, res) => {
           text: { endsWith: `created by ${req.user.name}` }
         }
       });
-      
+
       const createdTaskKeys = new Set();
       for (const act of userActivities) {
         const match = act.text.match(/Task (.*?) created by/);
@@ -83,7 +83,7 @@ exports.getTasks = async (req, res) => {
           select: { id: true }
         });
         const allowedIds = [req.user.id, ...myTeamMembers.map(m => m.id)];
-        
+
         // Team Leaders see ONLY tasks assigned to themselves or their own team members
         whereClause.assigneeId = { in: allowedIds };
       } else {
@@ -95,11 +95,11 @@ exports.getTasks = async (req, res) => {
     const tasks = await prisma.task.findMany({
       where: whereClause,
       include: {
-        assignee: { 
-          select: { 
+        assignee: {
+          select: {
             id: true, name: true, profilePic: true, designation: true,
-            teamLeader: { select: { name: true } } 
-          } 
+            teamLeader: { select: { name: true } }
+          }
         },
         comments: { select: { id: true } },
         attachments: { select: { id: true } }
@@ -116,7 +116,7 @@ exports.getTasks = async (req, res) => {
 exports.createTask = async (req, res) => {
   try {
     const { projectId, title, description, priority, assigneeId, estHours, dueDate, startTime } = req.body;
-    
+
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
@@ -175,7 +175,7 @@ exports.createTask = async (req, res) => {
           dueDate: dueDate ? new Date(dueDate) : null,
           createdAt: startTime ? new Date(startTime) : new Date()
         },
-        include: { 
+        include: {
           assignee: { select: { id: true, name: true, profilePic: true, designation: true, telegramId: true, teamLeader: { select: { name: true } } } },
           project: { select: { id: true, name: true } }
         }
@@ -202,9 +202,9 @@ exports.createTask = async (req, res) => {
         const dueStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No due date';
         const descStr = task.description ? task.description : 'No description provided.';
         const baseUrl = process.env.FRONTEND_URL || 'http://192.168.0.51:5173';
-        
+
         const message = `🔔 <b>NEW TASK ASSIGNED</b>\n\n📌 <b>Task:</b> <code>[${task.taskKey}]</code> <b>${task.title}</b>\n📁 <b>Project:</b> <code>${task.project?.name || 'N/A'}</code>\n🔥 <b>Priority:</b> <code>${task.priority}</code>\n⏱️ <b>Estimate:</b> <code>${estStr}</code>\n📅 <b>Due Date:</b> <code>${dueStr}</code>\n👤 <b>Assigned By:</b> <code>${req.user.name}</code>\n\n📝 <b>Description:</b>\n<blockquote>${descStr}</blockquote>\n\n🔗 <a href="${baseUrl}/board/${task.projectId}"><b>Open Kanban Board</b></a>`;
-        
+
         sendTelegram(message, task.assignee.telegramId);
       } catch (err) {
         console.error('Telegram notification error:', err);
@@ -257,11 +257,11 @@ exports.updateTask = async (req, res) => {
 
     const task = await prisma.task.update({
       where: { id: req.params.id },
-      data: { 
-        title, 
-        description, 
-        priority, 
-        dueDate: dueDate ? new Date(dueDate) : null, 
+      data: {
+        title,
+        description,
+        priority,
+        dueDate: dueDate ? new Date(dueDate) : null,
         estHours: estHours ? parseFloat(estHours) : null,
         createdAt: startTime ? new Date(startTime) : undefined
       },
@@ -320,8 +320,8 @@ exports.updateTaskStatus = async (req, res) => {
       return res.status(403).json({ error: 'You can only move tasks assigned to you.' });
     }
 
-    let dataUpdate = { 
-      status, 
+    let dataUpdate = {
+      status,
       stuckReason: status === 'STUCK' ? stuckReason : null // Clear reason if no longer stuck
     };
 
@@ -337,19 +337,19 @@ exports.updateTaskStatus = async (req, res) => {
       // If timer was running (startTime exists and endTime doesn't)
       if (taskToUpdate.startTime && !taskToUpdate.endTime) {
         const endTimeVal = new Date();
-        
+
         // Calculate duration in hours
         const diffMs = endTimeVal.getTime() - new Date(taskToUpdate.startTime).getTime();
         let hoursVal = diffMs / (1000 * 60 * 60);
         if (hoursVal < 0.01) hoursVal = 0.01;
         const roundedHours = parseFloat(hoursVal.toFixed(2));
-        
+
         // Auto-create TimeLog
         let note = `Auto-logged: Work stopped (Status: ${status})`;
         if (status === 'REVIEW' || status === 'DONE') {
           note = `Auto-logged: Task completed (${status === 'REVIEW' ? 'submitted to Review' : 'marked Done'})`;
         }
-        
+
         await prisma.timeLog.create({
           data: {
             hours: roundedHours,
@@ -374,7 +374,7 @@ exports.updateTaskStatus = async (req, res) => {
       data: dataUpdate
     });
 
-    const activityText = status === 'STUCK' 
+    const activityText = status === 'STUCK'
       ? `Task ${task.taskKey} moved to STUCK by ${req.user.name}. Reason: ${stuckReason || 'No reason provided'}`
       : `Task ${task.taskKey} moved to ${status} by ${req.user.name}`;
 
@@ -392,7 +392,7 @@ exports.updateTaskStatus = async (req, res) => {
 exports.assignTask = async (req, res) => {
   try {
     const { assigneeId } = req.body;
-    
+
     const task = await prisma.task.findUnique({ where: { id: req.params.id } });
     if (!task) return res.status(404).json({ error: 'Task not found' });
 
@@ -427,7 +427,7 @@ exports.assignTask = async (req, res) => {
     const updatedTask = await prisma.task.update({
       where: { id: req.params.id },
       data: { assigneeId },
-      include: { 
+      include: {
         assignee: { select: { id: true, name: true, profilePic: true, designation: true, telegramId: true, teamLeader: { select: { name: true } } } },
         project: { select: { id: true, name: true } }
       }
@@ -447,9 +447,9 @@ exports.assignTask = async (req, res) => {
         const dueStr = updatedTask.dueDate ? new Date(updatedTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No due date';
         const descStr = updatedTask.description ? updatedTask.description : 'No description provided.';
         const baseUrl = process.env.FRONTEND_URL || 'http://192.168.0.51:5173';
-        
+
         const message = `🔔 <b>NEW TASK ASSIGNED</b>\n\n📌 <b>Task:</b> <code>[${updatedTask.taskKey}]</code> <b>${updatedTask.title}</b>\n📁 <b>Project:</b> <code>${updatedTask.project?.name || 'N/A'}</code>\n🔥 <b>Priority:</b> <code>${updatedTask.priority}</code>\n⏱️ <b>Estimate:</b> <code>${estStr}</code>\n📅 <b>Due Date:</b> <code>${dueStr}</code>\n👤 <b>Assigned By:</b> <code>${req.user.name}</code>\n\n📝 <b>Description:</b>\n<blockquote>${descStr}</blockquote>\n\n🔗 <a href="${baseUrl}/board/${updatedTask.projectId}"><b>Open Kanban Board</b></a>`;
-        
+
         sendTelegram(message, updatedTask.assignee.telegramId);
       } catch (err) {
         console.error('Telegram notification error:', err);
@@ -481,7 +481,7 @@ exports.uploadAttachment = async (req, res) => {
     try {
       const task = await prisma.task.findUnique({
         where: { id },
-        include: { 
+        include: {
           assignee: { select: { id: true, name: true, telegramId: true } },
           project: { select: { name: true } }
         }
@@ -491,9 +491,9 @@ exports.uploadAttachment = async (req, res) => {
         const sendTelegram = require('../services/telegram');
         const filesStr = req.files.map(f => `📄 <i>${f.originalname}</i>`).join('\n');
         const baseUrl = process.env.FRONTEND_URL || 'http://192.168.0.51:5173';
-        
+
         const message = `📎 <b>NEW ATTACHMENT UPLOADED</b>\n\n📌 <b>Task:</b> <code>[${task.taskKey}]</code> <b>${task.title}</b>\n📁 <b>Project:</b> <code>${task.project?.name || 'Project'}</code>\n✍️ <b>Uploaded By:</b> <code>${req.user.name}</code>\n\n📁 <b>Uploaded Files:</b>\n<blockquote>${filesStr}</blockquote>\n\n🔗 <a href="${baseUrl}/board/${task.projectId}"><b>Open Kanban Board</b></a>`;
-        
+
         sendTelegram(message, task.assignee.telegramId);
       }
     } catch (telegramErr) {
@@ -510,12 +510,12 @@ exports.uploadAttachment = async (req, res) => {
 exports.deleteAttachment = async (req, res) => {
   try {
     const { id, attachmentId } = req.params;
-    
+
     // Optional: verify the attachment belongs to the task
     const attachment = await prisma.attachment.findFirst({
       where: { id: attachmentId, taskId: id }
     });
-    
+
     if (!attachment) {
       return res.status(404).json({ error: 'Attachment not found' });
     }
@@ -537,7 +537,7 @@ exports.stopTimerFromTelegram = async (req, res) => {
     const task = await prisma.task.findUnique({ where: { id: taskId } });
 
     if (!task) return res.status(404).send('Task not found');
-    
+
     // Only stop if currently in PROGRESS
     if (task.status !== 'PROGRESS') {
       return res.send(`
@@ -552,14 +552,14 @@ exports.stopTimerFromTelegram = async (req, res) => {
 
     if (task.startTime && !task.endTime) {
       const endTimeVal = new Date();
-      
+
       const diffMs = endTimeVal.getTime() - new Date(task.startTime).getTime();
       let hoursVal = diffMs / (1000 * 60 * 60);
       if (hoursVal < 0.01) hoursVal = 0.01;
       const roundedHours = parseFloat(hoursVal.toFixed(2));
-      
+
       let note = `Auto-logged: Stopped directly from Telegram reminder`;
-      
+
       await prisma.timeLog.create({
         data: {
           hours: roundedHours,
