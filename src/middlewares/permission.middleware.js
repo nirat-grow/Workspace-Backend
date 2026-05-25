@@ -41,7 +41,7 @@ const checkPermission = (permissionKey) => {
       if (
         req.user.globalRole === 'TEAM_LEADER' || 
         projectMember[permissionKey] === true ||
-        (permissionKey === 'canCreateTask' && req.user.globalRole === 'MEMBER')
+        ((permissionKey === 'canCreateTask' || permissionKey === 'canAssignTask') && req.user.globalRole === 'MEMBER')
       ) {
         return next();
       }
