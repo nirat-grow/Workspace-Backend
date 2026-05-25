@@ -185,7 +185,38 @@ exports.getDaily = async (req, res) => {
       prisma.task.findMany({ where: progressWhereClause, include: { assignee: true, project: true, timeLogs: { orderBy: { loggedAt: 'desc' } } } })
     ]);
 
-    res.json({ pending, stuck, hold, progress });
+    // Compute free members for ReportsPage
+    let workspaceMembers = await prisma.workspaceMember.findMany({
+      where: { workspaceId: req.user.primaryWorkspaceId },
+      include: { user: { select: { id: true, name: true, designation: true, globalRole: true, profilePic: true } } }
+    });
+
+    if (squadUserIds !== null) {
+      workspaceMembers = workspaceMembers.filter(wm => squadUserIds.includes(wm.userId));
+    } else if (showTeamData) {
+      const team = await prisma.user.findMany({
+        where: {
+          OR: [
+            { id: req.user.id },
+            { teamLeaderId: req.user.id },
+            { AND: [{ teamLeaderId: null }, { designation: req.user.designation }] }
+          ]
+        },
+        select: { id: true }
+      });
+      const teamUserIds = team.map(u => u.id);
+      workspaceMembers = workspaceMembers.filter(wm => teamUserIds.includes(wm.userId));
+    } else if (isPersonal || targetUserId) {
+      workspaceMembers = workspaceMembers.filter(wm => wm.userId === effectiveUserId);
+    }
+
+    const busyUserIds = new Set(progress.filter(t => t.status === 'PROGRESS').map(t => t.assigneeId).filter(Boolean));
+    const freeMembers = workspaceMembers
+      .map(wm => wm.user)
+      .filter(u => u.globalRole === 'MEMBER' || u.globalRole === 'TEAM_LEADER')
+      .filter(u => !busyUserIds.has(u.id));
+
+    res.json({ pending, stuck, hold, progress, freeMembers });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -840,7 +871,7 @@ exports.getGlobalReport = async (req, res) => {
     const globalPending = allTasks.filter(t => t.status === 'TODO');
 
     // Global progress (current tasks)
-    const globalProgress = allTasks.filter(t => t.status === 'PROGRESS' || t.status === 'TODO');
+    const globalProgress = allTasks.filter(t => t.status === 'PROGRESS');
 
     // Global stuck
     const globalStuck = allTasks.filter(t => t.status === 'STUCK');
@@ -937,24 +968,43 @@ exports.getGlobalReport = async (req, res) => {
 
     const memberPerformance = Object.values(memberMap).sort((a, b) => b.completedTasks - a.completedTasks);
 
+    // Compute free members
+    let workspaceMembers = await prisma.workspaceMember.findMany({
+      where: { workspaceId: req.user.primaryWorkspaceId },
+      include: { user: { select: { id: true, name: true, designation: true, globalRole: true, profilePic: true } } }
+    });
+
+    if (isTL && !isAdmin) {
+      workspaceMembers = workspaceMembers.filter(wm => teamUserIds.includes(wm.userId));
+    }
+
+    const busyUserIds = new Set(globalProgress.map(t => t.assigneeId).filter(Boolean));
+    const freeMembers = workspaceMembers
+      .map(wm => wm.user)
+      .filter(u => u.globalRole === 'MEMBER' || u.globalRole === 'TEAM_LEADER')
+      .filter(u => !busyUserIds.has(u.id));
+
     res.json({
       projectSummaries,
       globalStats: {
         totalProjects: projects.length,
         totalCompleted: globalCompleted.length,
         totalPending: globalPending.length,
+        totalProgress: globalProgress.length,
         totalStuck: globalStuck.length,
         totalHold: globalHold.length,
         totalOverdue: globalOverdue.length,
         totalHours: parseFloat(globalTotalHours.toFixed(2))
       },
       completionTrend,
+      progressTasks: globalProgress,
       completedTasks: globalCompleted,
       pendingTasks: globalPending,
       stuckTasks: globalStuck,
       holdTasks: globalHold,
       overdueTasks: globalOverdue,
-      memberPerformance
+      memberPerformance,
+      freeMembers
     });
   } catch (error) {
     console.error('Global report error:', error);
