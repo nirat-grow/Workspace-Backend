@@ -365,8 +365,10 @@ exports.getOverdue = async (req, res) => {
     const squadUserIds = isAdmin ? await getAdminSquadIds(leaderId, prisma) : null;
 
     let checkDate = new Date();
+    checkDate.setHours(0, 0, 0, 0);
     if (endDate) {
       checkDate = new Date(endDate);
+      checkDate.setHours(0, 0, 0, 0);
     }
 
     let whereClause = {
@@ -396,7 +398,9 @@ exports.getOverdue = async (req, res) => {
 
     // Map to add days overdue
     const result = overdue.map(t => {
-      const diffTime = Math.abs(checkDate - new Date(t.dueDate));
+      const due = new Date(t.dueDate);
+      due.setHours(0, 0, 0, 0);
+      const diffTime = Math.abs(checkDate - due);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       return { ...t, daysOverdue: diffDays };
     }).sort((a, b) => b.daysOverdue - a.daysOverdue);
@@ -818,7 +822,15 @@ exports.getGlobalReport = async (req, res) => {
       const progressTasks = tasks.filter(t => t.status === 'PROGRESS');
       const stuckTasks = tasks.filter(t => t.status === 'STUCK');
       const holdTasks = tasks.filter(t => t.status === 'HOLD');
-      const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'DONE');
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const overdueTasks = tasks.filter(t => {
+        if (!t.dueDate || t.status === 'DONE') return false;
+        const due = new Date(t.dueDate);
+        due.setHours(0, 0, 0, 0);
+        return due < today;
+      });
 
       // Calculate total hours
       let totalHours = 0;
@@ -880,10 +892,19 @@ exports.getGlobalReport = async (req, res) => {
     const globalHold = allTasks.filter(t => t.status === 'HOLD');
 
     // Global overdue
+    const todayGlobal = new Date();
+    todayGlobal.setHours(0, 0, 0, 0);
     const globalOverdue = allTasks
-      .filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'DONE')
+      .filter(t => {
+        if (!t.dueDate || t.status === 'DONE') return false;
+        const due = new Date(t.dueDate);
+        due.setHours(0, 0, 0, 0);
+        return due < todayGlobal;
+      })
       .map(t => {
-        const diffTime = Math.abs(new Date() - new Date(t.dueDate));
+        const due = new Date(t.dueDate);
+        due.setHours(0, 0, 0, 0);
+        const diffTime = Math.abs(todayGlobal - due);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return { ...t, daysOverdue: diffDays };
       })
@@ -1073,7 +1094,8 @@ exports.getHistory = async (req, res) => {
       where: whereClause,
       include: { 
         assignee: true,
-        project: { select: { name: true } }
+        project: { select: { name: true } },
+        timeLogs: true
       },
       orderBy: { updatedAt: 'desc' }
     });

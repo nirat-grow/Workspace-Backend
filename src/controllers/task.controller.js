@@ -346,8 +346,10 @@ exports.updateTaskStatus = async (req, res) => {
 
         // Auto-create TimeLog
         let note = `Auto-logged: Work stopped (Status: ${status})`;
-        if (status === 'REVIEW' || status === 'DONE') {
-          note = `Auto-logged: Task completed (${status === 'REVIEW' ? 'submitted to Review' : 'marked Done'})`;
+        if (status === 'DONE') {
+          note = `Auto-logged: Task completed (marked Done)`;
+        } else if (status === 'REVIEW') {
+          note = `Auto-logged: Work paused (submitted to Review)`;
         }
 
         await prisma.timeLog.create({
@@ -360,8 +362,8 @@ exports.updateTaskStatus = async (req, res) => {
         });
       }
 
-      // Reset timer timestamps for further cycles unless status is REVIEW or DONE
-      if (status === 'REVIEW' || status === 'DONE') {
+      // Reset timer timestamps for further cycles unless status is DONE
+      if (status === 'DONE') {
         dataUpdate.endTime = new Date();
       } else {
         dataUpdate.startTime = null;

@@ -134,3 +134,27 @@ exports.sendEndDayTimerAlert = async () => {
     console.error('Error sending end day timer alert:', error);
   }
 };
+
+exports.sendMorningTimerAlert = async () => {
+  try {
+    const usersWithPendingTasks = await prisma.user.findMany({
+      where: {
+        telegramId: { not: null },
+        assignedTasks: {
+          some: { status: { in: ['TODO', 'REVIEW', 'STUCK'] } }
+        }
+      }
+    });
+
+    if (usersWithPendingTasks.length === 0) return;
+
+    for (const user of usersWithPendingTasks) {
+      if (user.telegramId) {
+        const message = `🌅 *Good Morning!*\nHey ${user.name}, it's 9:30 AM! ☕\n\nPlease check your board to continue your tasks, and don't forget to start your timer when you begin working.\n\nHave a great and productive day! 🚀`;
+        await telegramService.sendMessage(message, user.telegramId);
+      }
+    }
+  } catch (error) {
+    console.error('Error sending morning timer alert:', error);
+  }
+};

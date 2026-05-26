@@ -26,4 +26,12 @@ cron.schedule('30 18 * * *', () => {
   timezone: "Asia/Kolkata"
 });
 
-console.log(`Cron jobs initialized. Daily report set to run at ${hour}:${minute} IST. Timer alerts at 18:30 IST.`);
+// Job 4 — Morning Timer Alert (Runs at 09:30 AM daily)
+cron.schedule('30 9 * * *', () => {
+  console.log('Running Morning Timer Alert Job');
+  reportService.sendMorningTimerAlert();
+}, {
+  timezone: "Asia/Kolkata"
+});
+
+console.log(`Cron jobs initialized. Daily report set to run at ${hour}:${minute} IST. End-day alerts at 18:30 IST. Morning alerts at 09:30 IST.`);
