@@ -219,3 +219,36 @@ exports.removeMember = async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
+
+exports.deleteProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminSecret } = req.body;
+
+    if (req.user.globalRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only admins can delete projects' });
+    }
+
+    if (adminSecret !== 'Meta123') {
+      return res.status(403).json({ error: 'Invalid Secret Code. Project deletion failed.' });
+    }
+
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    await prisma.$transaction([
+      prisma.timeLog.deleteMany({ where: { task: { projectId: id } } }),
+      prisma.attachment.deleteMany({ where: { task: { projectId: id } } }),
+      prisma.comment.deleteMany({ where: { task: { projectId: id } } }),
+      prisma.task.deleteMany({ where: { projectId: id } }),
+      prisma.projectMember.deleteMany({ where: { projectId: id } }),
+      prisma.activity.deleteMany({ where: { projectId: id } }),
+      prisma.project.delete({ where: { id } })
+    ]);
+
+    res.json({ success: true, message: 'Project deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};

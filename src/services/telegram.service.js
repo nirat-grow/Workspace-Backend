@@ -83,6 +83,28 @@ exports.startPolling = () => {
                 show_alert: true
               });
             }
+          } else if (callbackData.startsWith('start_timer_')) {
+            const taskId = callbackData.replace('start_timer_', '');
+            
+            const task = await prisma.task.findUnique({ where: { id: taskId } });
+            if (task && task.status !== 'PROGRESS') {
+              await prisma.task.update({
+                where: { id: task.id },
+                data: { status: 'PROGRESS', startTime: new Date(), endTime: null }
+              });
+
+              await axios.post(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+                callback_query_id: callbackId,
+                text: '🚀 Task Started successfully!',
+                show_alert: true
+              });
+            } else {
+              await axios.post(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+                callback_query_id: callbackId,
+                text: '⚠️ Task is already running or not found.',
+                show_alert: true
+              });
+            }
           }
         }
       }

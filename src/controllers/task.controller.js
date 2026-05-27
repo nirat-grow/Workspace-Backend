@@ -115,7 +115,7 @@ exports.getTasks = async (req, res) => {
 
 exports.createTask = async (req, res) => {
   try {
-    const { projectId, title, description, priority, assigneeId, estHours, dueDate, startTime } = req.body;
+    const { projectId, title, description, priority, assigneeId, estHours, dueDate, startTime, status } = req.body;
 
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -137,9 +137,6 @@ exports.createTask = async (req, res) => {
     }
 
     let finalAssigneeId = assigneeId;
-    if (req.user.globalRole === 'MEMBER') {
-      finalAssigneeId = req.user.id;
-    }
 
     const task = await prisma.$transaction(async (tx) => {
       // Security: If creator is Team Leader, they can only assign to self or their team
@@ -156,12 +153,7 @@ exports.createTask = async (req, res) => {
         }
       }
 
-      // Security: If creator is Member, they can only assign to themselves
-      if (req.user.globalRole === 'MEMBER') {
-        if (finalAssigneeId !== req.user.id) {
-          throw new Error('You can only assign tasks to yourself.');
-        }
-      }
+      // Security: Members can assign to any other project member.
 
       const newTask = await tx.task.create({
         data: {
@@ -173,7 +165,9 @@ exports.createTask = async (req, res) => {
           assigneeId: finalAssigneeId,
           estHours: estHours ? parseFloat(estHours) : null,
           dueDate: dueDate ? new Date(dueDate) : null,
-          createdAt: startTime ? new Date(startTime) : new Date()
+          createdAt: startTime ? new Date(startTime) : new Date(),
+          status: status || 'TODO',
+          startTime: status === 'PROGRESS' ? new Date() : null
         },
         include: {
           assignee: { select: { id: true, name: true, profilePic: true, designation: true, telegramId: true, teamLeader: { select: { name: true } } } },
@@ -413,7 +407,8 @@ exports.assignTask = async (req, res) => {
 
     const isAdmin = req.user.globalRole === 'ADMIN';
     const isTL = req.user.globalRole === 'TEAM_LEADER';
-    const canAssign = isAdmin || isTL || membership?.canAssignTask;
+    const isMember = req.user.globalRole === 'MEMBER';
+    const canAssign = isAdmin || isTL || (isMember && membership) || membership?.canAssignTask;
 
     if (!canAssign) {
       return res.status(403).json({ error: 'You do not have permission to assign tasks.' });

@@ -11,5 +11,6 @@ router.post('/:id/members', projectController.addMembers);
 router.post('/:id/members/bulk', projectController.addMembers);
 router.put('/:id/members/:userId', projectController.updateMember);
 router.delete('/:id/members/:userId', projectController.removeMember);
+router.delete('/:id', projectController.deleteProject);
 
 module.exports = router;

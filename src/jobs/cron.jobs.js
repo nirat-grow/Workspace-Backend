@@ -34,4 +34,20 @@ cron.schedule('30 9 * * *', () => {
   timezone: "Asia/Kolkata"
 });
 
-console.log(`Cron jobs initialized. Daily report set to run at ${hour}:${minute} IST. End-day alerts at 18:30 IST. Morning alerts at 09:30 IST.`);
+// Job 5 — Lunch Time Alert (Runs at 13:30 / 1:30 PM daily)
+cron.schedule('30 13 * * *', () => {
+  console.log('Running Lunch Time Alert Job');
+  reportService.sendLunchTimeAlert();
+}, {
+  timezone: "Asia/Kolkata"
+});
+
+// Job 6 — Post Lunch Timer Alert (Runs at 14:30 / 2:30 PM daily)
+cron.schedule('30 14 * * *', () => {
+  console.log('Running Post Lunch Timer Alert Job');
+  reportService.sendPostLunchTimerAlert();
+}, {
+  timezone: "Asia/Kolkata"
+});
+
+console.log(`Cron jobs initialized. Daily report set to run at ${hour}:${minute} IST. Morning alerts at 09:30 IST. Lunch alerts at 13:30 and 14:30 IST. End-day alerts at 18:30 IST.`);

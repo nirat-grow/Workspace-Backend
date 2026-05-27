@@ -158,3 +158,70 @@ exports.sendMorningTimerAlert = async () => {
     console.error('Error sending morning timer alert:', error);
   }
 };
+
+exports.sendLunchTimeAlert = async () => {
+  try {
+    const activeTasks = await prisma.task.findMany({
+      where: { status: 'PROGRESS' },
+      include: {
+        assignee: { select: { id: true, name: true, telegramId: true } },
+        project: { select: { name: true } }
+      }
+    });
+
+    const allUsers = await prisma.user.findMany({ where: { telegramId: { not: null } } });
+
+    for (const user of allUsers) {
+      if (user.telegramId) {
+        const userActiveTasks = activeTasks.filter(t => t.assigneeId === user.id);
+        
+        if (userActiveTasks.length > 0) {
+          const task = userActiveTasks[0];
+          const message = `🍔 *Lunch Time!*\nHey ${user.name}, it's 1:30 PM! You are currently working on \`[${task.taskKey}]\` (*${task.title}*).\n\nPlease stop your task and take a lunch break! 🍕🍹`;
+          const replyMarkup = {
+            inline_keyboard: [[
+              { text: '🛑 Stop Task Now', callback_data: `stop_timer_${task.id}` }
+            ]]
+          };
+          await telegramService.sendMessage(message, user.telegramId, replyMarkup);
+        } else {
+          const message = `🍔 *Lunch Time!*\nHey ${user.name}, it's 1:30 PM! Take a break, enjoy your lunch and recharge. 🍕🍹`;
+          await telegramService.sendMessage(message, user.telegramId);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error sending lunch time alert:', error);
+  }
+};
+
+exports.sendPostLunchTimerAlert = async () => {
+  try {
+    const allUsers = await prisma.user.findMany({ where: { telegramId: { not: null } } });
+
+    for (const user of allUsers) {
+      if (user.telegramId) {
+        const lastTask = await prisma.task.findFirst({
+          where: { assigneeId: user.id, status: { in: ['TODO', 'HOLD'] } },
+          orderBy: { updatedAt: 'desc' },
+          include: { project: { select: { name: true } } }
+        });
+
+        if (lastTask) {
+          const message = `🚀 *Break is over!*\nHey ${user.name}, it's 2:30 PM! Time to get back to work.\n\nDo you want to continue working on \`[${lastTask.taskKey}]\` (*${lastTask.title}*)? ⏱️`;
+          const replyMarkup = {
+            inline_keyboard: [[
+              { text: '▶️ Continue Task', callback_data: `start_timer_${lastTask.id}` }
+            ]]
+          };
+          await telegramService.sendMessage(message, user.telegramId, replyMarkup);
+        } else {
+          const message = `🚀 *Break is over!*\nHey ${user.name}, it's 2:30 PM! Time to get back to work. Please check your board and start your tasks! ⏱️`;
+          await telegramService.sendMessage(message, user.telegramId);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error sending post lunch timer alert:', error);
+  }
+};
