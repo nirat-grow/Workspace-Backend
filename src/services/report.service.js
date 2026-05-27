@@ -171,13 +171,22 @@ exports.sendLunchTimeAlert = async () => {
 
     const allUsers = await prisma.user.findMany({ where: { telegramId: { not: null } } });
 
+    // Check if today is Saturday (6)
+    const isSaturday = new Date().getDay() === 6;
+
     for (const user of allUsers) {
       if (user.telegramId) {
         const userActiveTasks = activeTasks.filter(t => t.assigneeId === user.id);
         
         if (userActiveTasks.length > 0) {
           const task = userActiveTasks[0];
-          const message = `🍔 *Lunch Time!*\nHey ${user.name}, it's 1:30 PM! You are currently working on \`[${task.taskKey}]\` (*${task.title}*).\n\nPlease stop your task and take a lunch break! 🍕🍹`;
+          let message = '';
+          if (isSaturday) {
+            message = `🎉 *HALF-DAY OVER! HAPPY WEEKEND!* 🎉\nHey ${user.name}, it's 1:30 PM on Saturday! Time to drop everything and run home! 🏃‍♂️💨\n\nYou are still working on \`[${task.taskKey}]\` (*${task.title}*).\n\nPlease stop your task immediately before your weekend starts! 🍻😎`;
+          } else {
+            message = `🍔 *Lunch Time!*\nHey ${user.name}, it's 1:30 PM! You are currently working on \`[${task.taskKey}]\` (*${task.title}*).\n\nPlease stop your task and take a lunch break! 🍕🍹`;
+          }
+
           const replyMarkup = {
             inline_keyboard: [[
               { text: '🛑 Stop Task Now', callback_data: `stop_timer_${task.id}` }
@@ -185,7 +194,12 @@ exports.sendLunchTimeAlert = async () => {
           };
           await telegramService.sendMessage(message, user.telegramId, replyMarkup);
         } else {
-          const message = `🍔 *Lunch Time!*\nHey ${user.name}, it's 1:30 PM! Take a break, enjoy your lunch and recharge. 🍕🍹`;
+          let message = '';
+          if (isSaturday) {
+            message = `🎉 *HALF-DAY OVER! HAPPY WEEKEND!* 🎉\nHey ${user.name}, it's 1:30 PM! Work is done, go enjoy your weekend! Catch you on Monday! 🍻😎`;
+          } else {
+            message = `🍔 *Lunch Time!*\nHey ${user.name}, it's 1:30 PM! Take a break, enjoy your lunch and recharge. 🍕🍹`;
+          }
           await telegramService.sendMessage(message, user.telegramId);
         }
       }

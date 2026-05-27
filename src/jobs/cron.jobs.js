@@ -18,32 +18,32 @@ cron.schedule('0 */6 * * *', () => {
   reportService.sendStuckTaskAlert();
 });
 
-// Job 3 — End of Day Timer Alert (Runs at 18:30 / 6:30 PM daily)
-cron.schedule('30 18 * * *', () => {
+// Job 3 — End of Day Timer Alert (Runs at 18:30 / 6:30 PM, Mon-Fri)
+cron.schedule('30 18 * * 1-5', () => {
   console.log('Running End of Day Timer Alert Job');
   reportService.sendEndDayTimerAlert();
 }, {
   timezone: "Asia/Kolkata"
 });
 
-// Job 4 — Morning Timer Alert (Runs at 09:30 AM daily)
-cron.schedule('30 9 * * *', () => {
+// Job 4 — Morning Timer Alert (Runs at 09:30 AM, Mon-Sat)
+cron.schedule('30 9 * * 1-6', () => {
   console.log('Running Morning Timer Alert Job');
   reportService.sendMorningTimerAlert();
 }, {
   timezone: "Asia/Kolkata"
 });
 
-// Job 5 — Lunch Time Alert (Runs at 13:30 / 1:30 PM daily)
-cron.schedule('30 13 * * *', () => {
+// Job 5 — Lunch Time Alert (Runs at 13:30 / 1:30 PM, Mon-Sat)
+cron.schedule('30 13 * * 1-6', () => {
   console.log('Running Lunch Time Alert Job');
   reportService.sendLunchTimeAlert();
 }, {
   timezone: "Asia/Kolkata"
 });
 
-// Job 6 — Post Lunch Timer Alert (Runs at 14:30 / 2:30 PM daily)
-cron.schedule('30 14 * * *', () => {
+// Job 6 — Post Lunch Timer Alert (Runs at 14:30 / 2:30 PM, Mon-Fri)
+cron.schedule('30 14 * * 1-5', () => {
   console.log('Running Post Lunch Timer Alert Job');
   reportService.sendPostLunchTimerAlert();
 }, {
