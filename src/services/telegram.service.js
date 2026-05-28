@@ -105,6 +105,70 @@ exports.startPolling = () => {
                 show_alert: true
               });
             }
+          } else if (callbackData.startsWith('stop_all_running_')) {
+            const leaderId = callbackData.replace('stop_all_running_', '');
+            
+            const leader = await prisma.user.findUnique({ where: { id: leaderId } });
+            if (!leader) {
+              await axios.post(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+                callback_query_id: callbackId,
+                text: '⚠️ Leader not found.',
+                show_alert: true
+              });
+              continue;
+            }
+
+            let whereClause = { status: 'PROGRESS' };
+            if (leader.globalRole === 'TEAM_LEADER') {
+              whereClause.assignee = {
+                OR: [
+                  { teamLeaderId: leader.id },
+                  { AND: [{ teamLeaderId: null }, { designation: leader.designation }, { globalRole: 'MEMBER' }] }
+                ]
+              };
+            }
+            
+            const runningTasks = await prisma.task.findMany({ where: whereClause });
+            
+            if (runningTasks.length === 0) {
+              await axios.post(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+                callback_query_id: callbackId,
+                text: '✅ No running tasks found.',
+                show_alert: true
+              });
+              continue;
+            }
+
+            let stoppedCount = 0;
+            for (const task of runningTasks) {
+              if (task.startTime && !task.endTime) {
+                const endTimeVal = new Date();
+                const diffMs = endTimeVal.getTime() - new Date(task.startTime).getTime();
+                let hoursVal = diffMs / (1000 * 60 * 60);
+                if (hoursVal < 0.01) hoursVal = 0.01;
+                
+                await prisma.timeLog.create({
+                  data: {
+                    hours: parseFloat(hoursVal.toFixed(2)),
+                    note: `Auto-logged: Stopped all by ${leader.name} via Telegram`,
+                    taskId: task.id,
+                    userId: task.assigneeId
+                  }
+                });
+              }
+              
+              await prisma.task.update({
+                where: { id: task.id },
+                data: { status: 'TODO', startTime: null, endTime: null }
+              });
+              stoppedCount++;
+            }
+
+            await axios.post(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+              callback_query_id: callbackId,
+              text: `✅ Stopped ${stoppedCount} task(s) successfully! Hours logged.`,
+              show_alert: true
+            });
           }
         }
       }

@@ -750,9 +750,11 @@ exports.getGlobalReport = async (req, res) => {
     const { startDate, endDate } = req.query;
     const isAdmin = req.user.globalRole === 'ADMIN';
     const isTL = req.user.globalRole === 'TEAM_LEADER';
+    const isMember = req.user.globalRole === 'MEMBER';
 
-    if (!isAdmin && !isTL) {
-      return res.status(403).json({ error: 'Access denied. Admin or Team Leader required.' });
+    // Allow ADMIN, TL, and MEMBER
+    if (!isAdmin && !isTL && !isMember) {
+      return res.status(403).json({ error: 'Access denied.' });
     }
 
     const tzOffset = req.query.tzOffset ? parseInt(req.query.tzOffset, 10) : 0;
@@ -763,7 +765,7 @@ exports.getGlobalReport = async (req, res) => {
       dateFilter = { gte: new Date(startDate), lte: new Date(endDate) };
     }
 
-    // For TL: get team user IDs
+    // For TL: get team user IDs. For MEMBER: just their own ID.
     let teamUserIds = [];
     if (isTL && !isAdmin) {
       const team = await prisma.user.findMany({
@@ -777,11 +779,13 @@ exports.getGlobalReport = async (req, res) => {
         select: { id: true }
       });
       teamUserIds = team.map(u => u.id);
+    } else if (isMember) {
+      teamUserIds = [req.user.id];
     }
 
-    // Fetch all projects (for TL, only projects they are member of)
+    // Fetch all projects (for TL or MEMBER, only projects they are member of)
     let projectWhere = { workspaceId: req.user.primaryWorkspaceId };
-    if (isTL && !isAdmin) {
+    if (!isAdmin) {
       projectWhere.members = { some: { userId: { in: teamUserIds } } };
     }
 
@@ -807,8 +811,8 @@ exports.getGlobalReport = async (req, res) => {
     const projectSummaries = projects.map(project => {
       let tasks = project.tasks;
 
-      // TL filter: only their team's tasks
-      if (isTL && !isAdmin) {
+      // TL or MEMBER filter: only their team's/own tasks
+      if (!isAdmin) {
         tasks = tasks.filter(t => teamUserIds.includes(t.assigneeId));
       }
 
@@ -836,7 +840,7 @@ exports.getGlobalReport = async (req, res) => {
       let totalHours = 0;
       tasks.forEach(t => {
         t.timeLogs.forEach(log => {
-          if (isTL && !isAdmin && !teamUserIds.includes(log.userId)) return;
+          if (!isAdmin && !teamUserIds.includes(log.userId)) return;
           if (dateFilter.gte && dateFilter.lte) {
             const logDate = new Date(log.loggedAt);
             if (logDate < dateFilter.gte || logDate > dateFilter.lte) return;
@@ -847,7 +851,7 @@ exports.getGlobalReport = async (req, res) => {
 
       // Member count
       let memberCount = project.members.length;
-      if (isTL && !isAdmin) {
+      if (!isAdmin) {
         memberCount = project.members.filter(m => teamUserIds.includes(m.userId)).length;
       }
 
@@ -869,7 +873,7 @@ exports.getGlobalReport = async (req, res) => {
 
     // Flatten all tasks across projects for detailed tables
     let allTasks = projects.flatMap(p => p.tasks);
-    if (isTL && !isAdmin) {
+    if (!isAdmin) {
       allTasks = allTasks.filter(t => teamUserIds.includes(t.assigneeId));
     }
 
@@ -914,7 +918,7 @@ exports.getGlobalReport = async (req, res) => {
     let globalTotalHours = 0;
     allTasks.forEach(t => {
       t.timeLogs.forEach(log => {
-        if (isTL && !isAdmin && !teamUserIds.includes(log.userId)) return;
+        if (!isAdmin && !teamUserIds.includes(log.userId)) return;
         if (dateFilter.gte && dateFilter.lte) {
           const logDate = new Date(log.loggedAt);
           if (logDate < dateFilter.gte || logDate > dateFilter.lte) return;
@@ -950,7 +954,7 @@ exports.getGlobalReport = async (req, res) => {
     const memberMap = {};
     projects.forEach(project => {
       project.members.forEach(pm => {
-        if (isTL && !isAdmin && !teamUserIds.includes(pm.userId)) return;
+        if (!isAdmin && !teamUserIds.includes(pm.userId)) return;
         if (!memberMap[pm.userId]) {
           memberMap[pm.userId] = {
             id: pm.user.id,
@@ -995,7 +999,7 @@ exports.getGlobalReport = async (req, res) => {
       include: { user: { select: { id: true, name: true, designation: true, globalRole: true, profilePic: true } } }
     });
 
-    if (isTL && !isAdmin) {
+    if (!isAdmin) {
       workspaceMembers = workspaceMembers.filter(wm => teamUserIds.includes(wm.userId));
     }
 

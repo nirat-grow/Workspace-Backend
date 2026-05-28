@@ -50,4 +50,21 @@ cron.schedule('30 14 * * 1-5', () => {
   timezone: "Asia/Kolkata"
 });
 
-console.log(`Cron jobs initialized. Daily report set to run at ${hour}:${minute} IST. Morning alerts at 09:30 IST. Lunch alerts at 13:30 and 14:30 IST. End-day alerts at 18:30 IST.`);
+// Job 7 — Leader Running Task Alerts (Runs at 13:33 / 1:33 PM, Mon-Sat)
+cron.schedule('33 13 * * 1-6', () => {
+  console.log('Running Leader Running Task Alert Job (13:33)');
+  reportService.sendLeaderRunningTaskAlert();
+}, {
+  timezone: "Asia/Kolkata"
+});
+
+// Job 8 — Leader Running Task Alerts (Runs at 18:30 / 6:30 PM, Mon-Fri)
+cron.schedule('30 18 * * 1-5', () => {
+  console.log('Running Leader Running Task Alert Job (18:30)');
+  reportService.sendLeaderRunningTaskAlert();
+}, {
+  timezone: "Asia/Kolkata"
+});
+
+console.log(`Cron jobs initialized. Daily report set to run at ${hour}:${minute} IST. Morning alerts at 09:30 IST. Lunch alerts at 13:30 and 14:30 IST. End-day alerts at 18:30 IST. Leader alerts at 13:33 and 18:30 IST.`);
+

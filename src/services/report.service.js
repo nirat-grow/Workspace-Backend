@@ -239,3 +239,65 @@ exports.sendPostLunchTimerAlert = async () => {
     console.error('Error sending post lunch timer alert:', error);
   }
 };
+
+exports.sendLeaderRunningTaskAlert = async () => {
+  try {
+    const runningTasks = await prisma.task.findMany({
+      where: { status: 'PROGRESS' },
+      include: {
+        assignee: { select: { id: true, name: true, globalRole: true, teamLeaderId: true, designation: true } },
+        project: { select: { name: true } }
+      }
+    });
+
+    if (runningTasks.length === 0) return;
+
+    const leaders = await prisma.user.findMany({
+      where: { telegramId: { not: null }, globalRole: { in: ['ADMIN', 'TEAM_LEADER'] } }
+    });
+
+    for (const leader of leaders) {
+      if (!leader.telegramId) continue;
+
+      let targetTasks = [];
+
+      if (leader.globalRole === 'ADMIN') {
+        targetTasks = runningTasks;
+      } else if (leader.globalRole === 'TEAM_LEADER') {
+        targetTasks = runningTasks.filter(t => 
+          t.assignee && (
+            t.assignee.teamLeaderId === leader.id || 
+            (t.assignee.teamLeaderId == null && t.assignee.designation === leader.designation && t.assignee.globalRole === 'MEMBER')
+          )
+        );
+      }
+
+      if (targetTasks.length > 0) {
+        let message = `⚠️ *Running Task Alert*\n\nHey ${leader.name}, here are the members currently running tasks:\n\n`;
+        
+        targetTasks.forEach(t => {
+          message += `🔹 *${t.assignee.name}* is working on \`[${t.taskKey || t.id.slice(0,5)}]\` in ${t.project?.name || 'Project'}\n`;
+        });
+
+        message += `\nYou can stop specific tasks or stop them all below.`;
+
+        const inline_keyboard = targetTasks.map(t => ([{
+          text: `🛑 Stop ${t.assignee.name}'s Task`,
+          callback_data: `stop_timer_${t.id}`
+        }]));
+
+        inline_keyboard.push([{
+          text: `⛔ Stop All Running Tasks`,
+          callback_data: `stop_all_running_${leader.id}`
+        }]);
+
+        const replyMarkup = { inline_keyboard };
+
+        await telegramService.sendMessage(message, leader.telegramId, replyMarkup);
+      }
+    }
+
+  } catch (error) {
+    console.error('Error sending leader running task alert:', error);
+  }
+};
