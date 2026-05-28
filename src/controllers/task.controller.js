@@ -319,6 +319,26 @@ exports.updateTaskStatus = async (req, res) => {
       stuckReason: status === 'STUCK' ? stuckReason : null // Clear reason if no longer stuck
     };
 
+    // Prevent multiple running tasks for the same assignee
+    if (status === 'PROGRESS' && taskToUpdate.status !== 'PROGRESS') {
+      const assigneeId = taskToUpdate.assigneeId;
+      if (assigneeId) {
+        const currentlyRunning = await prisma.task.findFirst({
+          where: {
+            assigneeId: assigneeId,
+            status: 'PROGRESS',
+            id: { not: taskToUpdate.id }
+          }
+        });
+        
+        if (currentlyRunning) {
+          return res.status(400).json({ 
+            error: 'A task is already running! Please stop or finish the current running task before starting a new one.' 
+          });
+        }
+      }
+    }
+
     // Auto-Timer Logic
     if (status === 'PROGRESS') {
       // Transitioned to PROGRESS: set startTime if we were not already in PROGRESS
