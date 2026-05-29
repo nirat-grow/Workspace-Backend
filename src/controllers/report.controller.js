@@ -767,7 +767,9 @@ exports.getGlobalReport = async (req, res) => {
 
     // For TL: get team user IDs. For MEMBER: just their own ID.
     let teamUserIds = [];
-    if (isTL && !isAdmin) {
+    if (req.query.personal === 'true') {
+      teamUserIds = [req.user.id];
+    } else if (isTL && !isAdmin) {
       const team = await prisma.user.findMany({
         where: {
           OR: [

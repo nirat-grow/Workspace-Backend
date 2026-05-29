@@ -266,6 +266,7 @@ exports.sendLeaderRunningTaskAlert = async () => {
       } else if (leader.globalRole === 'TEAM_LEADER') {
         targetTasks = runningTasks.filter(t => 
           t.assignee && (
+            t.assignee.id === leader.id ||
             t.assignee.teamLeaderId === leader.id || 
             (t.assignee.teamLeaderId == null && t.assignee.designation === leader.designation && t.assignee.globalRole === 'MEMBER')
           )
@@ -273,16 +274,18 @@ exports.sendLeaderRunningTaskAlert = async () => {
       }
 
       if (targetTasks.length > 0) {
-        let message = `⚠️ *Running Task Alert*\n\nHey ${leader.name}, here are the members currently running tasks:\n\n`;
+        let message = `⚠️ *Running Task Alert*\n\nHey ${leader.name ? leader.name.replace(/[*_`]/g, '') : 'Leader'}, here are the members currently running tasks:\n\n`;
         
         targetTasks.forEach(t => {
-          message += `🔹 *${t.assignee.name}* is working on \`[${t.taskKey || t.id.slice(0,5)}]\` in ${t.project?.name || 'Project'}\n`;
+          const uName = (t.assignee?.name || 'Unassigned').replace(/[*_`]/g, '');
+          const pName = (t.project?.name || 'Project').replace(/[*_`]/g, '');
+          message += `🔹 *${uName}* is working on \`[${t.taskKey || t.id.slice(0,5)}]\` in ${pName}\n`;
         });
 
         message += `\nYou can stop specific tasks or stop them all below.`;
 
         const inline_keyboard = targetTasks.map(t => ([{
-          text: `🛑 Stop ${t.assignee.name}'s Task`,
+          text: `🛑 Stop ${t.assignee?.name || 'Unassigned'}'s Task`,
           callback_data: `stop_timer_${t.id}`
         }]));
 
